@@ -1,0 +1,44 @@
+name: Build Apple Silicon on Intel macOS
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: macos-15-intel
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Verify universal Python runtime
+        run: |
+          python3 - <<'PY'
+          import os, sysconfig
+          library = os.path.join(sysconfig.get_config_var('LIBDIR'), sysconfig.get_config_var('LDLIBRARY'))
+          print(library)
+          PY
+          library="$(python3 -c 'import os,sysconfig; print(os.path.join(sysconfig.get_config_var("LIBDIR"), sysconfig.get_config_var("LDLIBRARY")))')"
+          lipo -verify_arch arm64 "$library"
+      - name: Cross-build Apple Silicon package
+        env:
+          MAC_BUILD_ARCH: arm64
+        run: bash build_macos_companion.sh
+      - name: Validate arm64 package
+        run: |
+          app="build/macos-arm64/app-dist/ResearchCompanionMac.app"
+          lipo -verify_arch arm64 "$app/Contents/MacOS/ResearchCompanionMac"
+          lipo -verify_arch arm64 "$app/Contents/Resources/ResearchCompanionWorker"
+          test -s dist/ResearchCompanionMac-arm64.pkg
+          pkgutil --expand dist/ResearchCompanionMac-arm64.pkg "$RUNNER_TEMP/research-companion-expanded"
+          test -f "$RUNNER_TEMP/research-companion-expanded/PackageInfo"
+      - name: Upload installer
+        uses: actions/upload-artifact@v4
+        with:
+          name: research-companion-arm64-cross
+          path: dist/ResearchCompanionMac-arm64.pkg
+          if-no-files-found: error

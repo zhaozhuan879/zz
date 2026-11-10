@@ -10,7 +10,8 @@ if [[ "$(uname -s)" != "Darwin" ]]; then
 fi
 
 ROOT="$(cd "$(dirname "$0")" && pwd)"
-ARCH="$(uname -m)"
+HOST_ARCH="$(uname -m)"
+ARCH="${MAC_BUILD_ARCH:-$HOST_ARCH}"
 case "$ARCH" in
   arm64)
     TRIPLE="aarch64-apple-darwin"
@@ -25,6 +26,14 @@ esac
 BUILD="$ROOT/build/macos-$ARCH"
 DIST="$ROOT/dist"
 mkdir -p "$BUILD" "$DIST"
+PYI_ARCH_ARGS=()
+if [[ "$ARCH" != "$HOST_ARCH" ]]; then
+  if [[ "$HOST_ARCH" != "x86_64" || "$ARCH" != "arm64" ]]; then
+    echo "Unsupported cross-build: $HOST_ARCH to $ARCH" >&2
+    exit 2
+  fi
+  PYI_ARCH_ARGS=(--target-arch arm64)
+fi
 
 python3 -m venv "$BUILD/venv"
 PYTHON="$BUILD/venv/bin/python"
@@ -51,12 +60,12 @@ fi
 LEGAL=(--add-data "$ROOT/legal/CODEX_LICENSE.txt:legal"
        --add-data "$ROOT/legal/CODEX_NOTICE.txt:legal")
 
-"$PYTHON" -m PyInstaller --noconfirm --clean --onefile \
+"$PYTHON" -m PyInstaller --noconfirm --clean --onefile "${PYI_ARCH_ARGS[@]}" \
   --name ResearchCompanionWorker \
   --distpath "$BUILD/worker-dist" --workpath "$BUILD/worker-build" \
   --specpath "$BUILD" "${BINARIES[@]}" "${LEGAL[@]}" "$ROOT/companion_macos.py"
 
-"$PYTHON" -m PyInstaller --noconfirm --clean --onedir --windowed --argv-emulation \
+"$PYTHON" -m PyInstaller --noconfirm --clean --onedir --windowed --argv-emulation "${PYI_ARCH_ARGS[@]}" \
   --name ResearchCompanionMac \
   --osx-bundle-identifier com.yunzhengdata.researchcompanion \
   --distpath "$BUILD/app-dist" --workpath "$BUILD/app-build" \
