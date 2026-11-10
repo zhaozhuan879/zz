@@ -1,0 +1,44 @@
+name: Build macOS research companion
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: macos-15
+            arch: arm64
+          - runner: macos-15-intel
+            arch: x86_64
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Build native package
+        run: |
+          test "$(uname -m)" = "${{ matrix.arch }}"
+          bash build_macos_companion.sh
+      - name: Validate package structure
+        run: |
+          pkg="dist/ResearchCompanionMac-${{ matrix.arch }}.pkg"
+          test -s "$pkg"
+          pkgutil --expand "$pkg" "$RUNNER_TEMP/research-companion-expanded"
+          test -f "$RUNNER_TEMP/research-companion-expanded/PackageInfo"
+      - name: Upload installer
+        uses: actions/upload-artifact@v4
+        with:
+          name: research-companion-${{ matrix.arch }}
+          path: dist/ResearchCompanionMac-${{ matrix.arch }}.pkg
+          if-no-files-found: error
