@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Build on macOS. Produces a per-architecture .pkg containing the URL handler
-# app and a self-contained launchd worker. Build-time Python and npm are not
-# required on students' Macs.
+# app and a self-contained launchd worker. Build-time Python is not required
+# on students' Macs.
 set -euo pipefail
 
 if [[ "$(uname -s)" != "Darwin" ]]; then
@@ -12,8 +12,14 @@ fi
 ROOT="$(cd "$(dirname "$0")" && pwd)"
 ARCH="$(uname -m)"
 case "$ARCH" in
-  arm64) TRIPLE="aarch64-apple-darwin" ;;
-  x86_64) TRIPLE="x86_64-apple-darwin" ;;
+  arm64)
+    TRIPLE="aarch64-apple-darwin"
+    CODEX_SHA256="34d12384d90f8e09b0b9abaabf2a0ac02a52093b131504aeaf282107f54a44b2"
+    ;;
+  x86_64)
+    TRIPLE="x86_64-apple-darwin"
+    CODEX_SHA256="792ecab0596006bd9f286430b2790aa487fd40fca2f351ca313ad85991720226"
+    ;;
   *) echo "Unsupported Mac architecture: $ARCH" >&2; exit 2 ;;
 esac
 BUILD="$ROOT/build/macos-$ARCH"
@@ -23,17 +29,24 @@ mkdir -p "$BUILD" "$DIST"
 python3 -m venv "$BUILD/venv"
 PYTHON="$BUILD/venv/bin/python"
 "$PYTHON" -m pip install --upgrade 'pyinstaller==6.22.2' 'httpx>=0.28,<1'
-npm install --prefix "$BUILD/npm" --no-save --ignore-scripts '@openai/codex@0.165.0'
-CODEX="$(find "$BUILD/npm/node_modules" -path "*/vendor/$TRIPLE/bin/codex" -type f -print -quit)"
-if [[ -z "$CODEX" ]]; then
-  echo "Codex native binary for $TRIPLE was not installed." >&2
-  exit 3
-fi
+CODEX_VERSION="0.165.0"
+ARCHIVE="$BUILD/codex-package-$TRIPLE.tar.gz"
+CODEX_PACKAGE="$BUILD/codex-package"
+curl --fail --location --retry 3 --output "$ARCHIVE" \
+  "https://github.com/openai/codex/releases/download/rust-v$CODEX_VERSION/codex-package-$TRIPLE.tar.gz"
+printf '%s  %s\n' "$CODEX_SHA256" "$ARCHIVE" | shasum -a 256 --check
+mkdir -p "$CODEX_PACKAGE"
+tar -xzf "$ARCHIVE" -C "$CODEX_PACKAGE"
+CODEX="$CODEX_PACKAGE/bin/codex"
+test -x "$CODEX"
 
 BINARIES=(--add-binary "$CODEX:codex-bin")
-CODE_MODE_HOST="$(dirname "$CODEX")/codex-code-mode-host"
+CODE_MODE_HOST="$CODEX_PACKAGE/bin/codex-code-mode-host"
 if [[ -f "$CODE_MODE_HOST" ]]; then
   BINARIES+=(--add-binary "$CODE_MODE_HOST:codex-bin")
+fi
+if [[ -f "$CODEX_PACKAGE/codex-path/rg" ]]; then
+  BINARIES+=(--add-binary "$CODEX_PACKAGE/codex-path/rg:codex-bin")
 fi
 LEGAL=(--add-data "$ROOT/legal/CODEX_LICENSE.txt:legal"
        --add-data "$ROOT/legal/CODEX_NOTICE.txt:legal")

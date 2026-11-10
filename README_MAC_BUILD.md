@@ -10,7 +10,7 @@
 bash build_macos_companion.sh
 ```
 
-构建机需要 `python3`、`npm`、Xcode Command Line Tools。脚本在项目的 `build/` 下创建隔离 Python 环境，不修改全局 Python。也可将本目录放入私有 GitHub 仓库，手动触发 `.github/workflows/macos-companion.yml`，分别取得两个架构的构建产物。
+构建机需要 `python3`、`curl`、Xcode Command Line Tools。脚本在项目的 `build/` 下创建隔离 Python 环境，不修改全局 Python。也可将本目录放入私有 GitHub 仓库，手动触发 `.github/workflows/macos-companion.yml`，分别取得两个架构的构建产物。
 
 没有 Mac 时，先在 GitHub 创建一个**空的私有仓库**，将 `dist/ResearchCompanionMac-build-kit.zip` 解压后的全部内容（包括 `.github/workflows/macos-companion.yml`）放入该仓库并推送到默认分支。打开仓库的 Actions → Build macOS research companion → Run workflow。工作流会分别在 Apple Silicon 和 Intel macOS 运行器上构建、检查 `.pkg` 结构，并上传两个独立构建产物。下载产物后，还需在对应架构的真实 Mac 上按下文进行安装和任务验收，才能放到平台的下载目录。
 
