@@ -17,13 +17,8 @@ jobs:
           python-version: '3.12'
       - name: Verify universal Python runtime
         run: |
-          python3 - <<'PY'
-          import os, sysconfig
-          library = os.path.join(sysconfig.get_config_var('LIBDIR'), sysconfig.get_config_var('LDLIBRARY'))
-          print(library)
-          PY
-          library="$(python3 -c 'import os,sysconfig; print(os.path.join(sysconfig.get_config_var("LIBDIR"), sysconfig.get_config_var("LDLIBRARY")))')"
-          lipo -verify_arch arm64 "$library"
+          python_binary="$(python3 -c 'import sys; print(sys.executable)')"
+          lipo "$python_binary" -verify_arch arm64
       - name: Cross-build Apple Silicon package
         env:
           MAC_BUILD_ARCH: arm64
@@ -31,8 +26,8 @@ jobs:
       - name: Validate arm64 package
         run: |
           app="build/macos-arm64/app-dist/ResearchCompanionMac.app"
-          lipo -verify_arch arm64 "$app/Contents/MacOS/ResearchCompanionMac"
-          lipo -verify_arch arm64 "$app/Contents/Resources/ResearchCompanionWorker"
+          lipo "$app/Contents/MacOS/ResearchCompanionMac" -verify_arch arm64
+          lipo "$app/Contents/Resources/ResearchCompanionWorker" -verify_arch arm64
           test -s dist/ResearchCompanionMac-arm64.pkg
           pkgutil --expand dist/ResearchCompanionMac-arm64.pkg "$RUNNER_TEMP/research-companion-expanded"
           test -f "$RUNNER_TEMP/research-companion-expanded/PackageInfo"
